@@ -28,6 +28,7 @@ NAMES += hwprofile
 NAMES += cache
 NAMES += drcov
 NAMES += devaccess
+NAMES += armcov
 
 ifeq ($(CONFIG_WIN32),y)
 SO_SUFFIX := .dll
