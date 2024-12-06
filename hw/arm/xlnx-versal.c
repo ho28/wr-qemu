@@ -37,6 +37,7 @@
 #include "hw/misc/xlnx-versal-pmc-iou-slcr.h"
 #include "hw/nvram/xlnx-bbram.h"
 #include "hw/misc/xlnx-versal-trng.h"
+#include "hw/misc/xlnx-versal-lpd-iou-slcr.h"
 #include "hw/rtc/xlnx-zynqmp-rtc.h"
 #include "hw/misc/xlnx-versal-cfu.h"
 #include "hw/misc/xlnx-versal-cframe-reg.h"
@@ -190,6 +191,7 @@ typedef struct VersalMap {
         int irq;
     } ospi;
 
+    VersalSimplePeriphMap lpd_iou_slcr;
     VersalSimplePeriphMap pmc_iou_slcr;
     VersalSimplePeriphMap bbram;
     VersalSimplePeriphMap trng;
@@ -322,6 +324,7 @@ static const VersalMap VERSAL_MAP = {
         .irq = 124,
     },
 
+    .lpd_iou_slcr = { 0xff080000 },
     .pmc_iou_slcr = { 0xf1060000, OR_IRQ(121, 0) },
     .bbram = { 0xf11f0000, OR_IRQ(121, 1) },
     .trng = { 0xf1230000, 173 },
@@ -1093,6 +1096,20 @@ static void versal_create_canfd(Versal *s, const VersalSimplePeriphMap *map,
     qemu_fdt_setprop_cells(s->cfg.fdt, node, "interrupts",
                            GIC_FDT_IRQ_TYPE_SPI, map->irq,
                            GIC_FDT_IRQ_FLAGS_LEVEL_HI);
+}
+
+static void versal_create_lpd_iou_slcr(Versal *s,
+                                       const VersalSimplePeriphMap *map)
+{
+    SysBusDevice *sbd;
+    MemoryRegion *mr;
+
+    sbd = SYS_BUS_DEVICE(qdev_new(TYPE_XLNX_LPD_IOU_SLCR));
+    sysbus_realize_and_unref(sbd, &error_fatal);
+
+    mr = sysbus_mmio_get_region(sbd, 0);
+
+    memory_region_add_subregion(&s->mr_ps, map->addr, mr);
 }
 
 static void versal_create_usb(Versal *s,
@@ -1946,6 +1963,7 @@ static void versal_realize(DeviceState *dev, Error **errp)
 
     versal_realize_common(s);
     versal_unimp(s);
+    versal_create_lpd_iou_slcr(s, &map->lpd_iou_slcr);
 }
 
 static void versal2_realize(DeviceState *dev, Error **errp)
