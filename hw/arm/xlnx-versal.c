@@ -40,6 +40,7 @@
 #include "hw/misc/xlnx-versal-trng.h"
 #include "hw/misc/xlnx-versal-lpd-iou-slcr.h"
 #include "hw/misc/xlnx-versal-lpd-slcr.h"
+#include "hw/misc/xlnx-versal-pmc-int.h"
 #include "hw/rtc/xlnx-zynqmp-rtc.h"
 #include "hw/misc/xlnx-versal-cfu.h"
 #include "hw/misc/xlnx-versal-cframe-reg.h"
@@ -225,6 +226,7 @@ typedef struct VersalMap {
     VersalSimplePeriphMap slcr;
     VersalSimplePeriphMap int_csr;
     VersalSimplePeriphMap crl;
+    VersalSimplePeriphMap pmcint;
 
     /* reserved MMIO/IRQ space that can safely be used for virtio devices */
     struct VersalReserved {
@@ -358,6 +360,8 @@ static const VersalMap VERSAL_MAP = {
     .int_csr= { 0xfe600000 },
 
     .crl = { 0xff5e0000, 10 },
+
+    .pmcint = { 0xf1330000 },
 
     .reserved = { 0xa0000000, 111, 8 },
 };
@@ -1695,6 +1699,20 @@ static void versal_create_cfu(Versal *s, const struct VersalCfuMap *map)
                                 sysbus_mmio_get_region(sbd, 0));
 }
 
+static void versal_create_pmcint(Versal *s,
+                                 const VersalSimplePeriphMap *map)
+{
+    SysBusDevice *sbd;
+    MemoryRegion *mr;
+
+    sbd = SYS_BUS_DEVICE(qdev_new(TYPE_XILINX_PMC_INT_REGS));
+    sysbus_realize_and_unref(sbd, &error_fatal);
+
+    mr = sysbus_mmio_get_region(sbd, 0);
+
+    memory_region_add_subregion(&s->mr_ps, map->addr, mr);
+}
+
 static inline void crl_connect_dev(Object *crl, Object *dev)
 {
     const char *prop = object_get_canonical_path_component(dev);
@@ -2002,6 +2020,7 @@ static void versal_realize(DeviceState *dev, Error **errp)
     versal_create_lpd_iou_slcr(s, &map->lpd_iou_slcr);
     versal_create_lpd_slcr(s, &map->slcr);
     versal_create_intlpd_csr(s, &map->int_csr);
+    versal_create_pmcint(s, &map->pmcint);
 }
 
 static void versal2_realize(DeviceState *dev, Error **errp)
