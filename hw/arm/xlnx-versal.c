@@ -1116,7 +1116,7 @@ static void versal_create_lpd_iou_slcr(Versal *s,
     SysBusDevice *sbd;
     MemoryRegion *mr;
 
-    sbd = SYS_BUS_DEVICE(qdev_new(TYPE_XLNX_LPD_IOU_SLCR));
+    sbd = SYS_BUS_DEVICE(qdev_new(TYPE_XILINX_LPD_IOU_SLCR));
     sysbus_realize_and_unref(sbd, &error_fatal);
 
     mr = sysbus_mmio_get_region(sbd, 0);
