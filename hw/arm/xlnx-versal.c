@@ -1797,7 +1797,7 @@ static void versal_create_smmu(Versal *s, const VersalSimplePeriphMap *map)
     dev = qdev_new(TYPE_XILINX_SMMU500);
     object_property_add_child(OBJECT(s), "mmu-500", OBJECT(dev));
     sbd = SYS_BUS_DEVICE(dev);
-    object_property_set_link(OBJECT(dev), "dma", OBJECT(&s->mr_ps),
+    object_property_set_link(OBJECT(dev), "mr-0", OBJECT(&s->mr_ps),
                              &error_abort);
     sysbus_realize_and_unref(sbd, &error_fatal);
 
@@ -1842,8 +1842,6 @@ static void versal_create_lpd_slcr(Versal *s, uint64_t addr)
 
 /*
  * This takes the board allocated linear DDR memory and creates aliases
- * for each split DDR range/aperture on the Versal address map.
- */
 static void versal_map_ddr(Versal *s, const struct VersalDDRMap *map)
 {
     uint64_t size = memory_region_size(s->cfg.mr_ddr);
