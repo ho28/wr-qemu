@@ -49,6 +49,7 @@
 #include "hw/intc/arm_gicv3_common.h"
 #include "hw/intc/arm_gicv3_its_common.h"
 #include "hw/intc/arm_gic.h"
+#include "hw/pci-host/gpex.h"
 #include "hw/core/split-irq.h"
 #include "target/arm/cpu.h"
 #include "hw/cpu/cluster.h"
@@ -81,6 +82,18 @@ typedef struct VersalSimplePeriphMap {
     uint64_t addr;
     int irq;
 } VersalSimplePeriphMap;
+
+typedef struct VersalPcieMap {
+    uint64_t mmio_addr;
+    uint64_t mmio_size;
+    uint64_t pio_addr;
+    uint64_t pio_size;
+    uint64_t mmio_high_addr;
+    uint64_t mmio_high_size;
+    uint64_t ecam_high_addr;
+    uint64_t ecam_high_size;
+    int irq;
+} VersalPcieMap;
 
 typedef struct VersalMemMap {
     uint64_t addr;
@@ -142,6 +155,8 @@ typedef struct VersalMap {
 
     VersalSimplePeriphMap canfd[4];
     size_t num_canfd;
+
+    VersalPcieMap pcibus;
 
     VersalSimplePeriphMap sdhci[2];
     size_t num_sdhci;
@@ -299,6 +314,18 @@ static const VersalMap VERSAL_MAP = {
     .canfd[0] = { 0xff060000, 20 },
     .canfd[1] = { 0xff070000, 21 },
     .num_canfd = 2,
+
+    .pcibus = {
+        .mmio_addr = 0x90000000,
+        .mmio_size = 0x2eff0000,
+        .pio_addr = 0xbeff0000,
+        .pio_size = GPEX_IO_PORT_SIZE,
+        .mmio_high_addr = 0x100000000,
+        .mmio_high_size = 0x6f0000000,
+        .ecam_high_addr = 0x7f0000000,
+        .ecam_high_size = 0x10000000,
+        .irq = 92,
+    },
 
     .sdhci[0] = { 0xf1040000, 126 },
     .sdhci[1] = { 0xf1050000, 128 },
@@ -1029,6 +1056,60 @@ static void versal_create_cpu_cluster(Versal *s, const VersalCpuClusterMap *map)
         qemu_fdt_setprop(s->cfg.fdt, "/timer", "compatible",
                          compatible, sizeof(compatible));
     }
+}
+
+static void versal_create_pcie(Versal *s,
+                               const VersalPcieMap *map)
+{
+    DeviceState *dev;
+    PCIHostState *pci;
+    MemoryRegion *ecam_alias;
+    MemoryRegion *ecam_reg;
+    MemoryRegion *mmio_alias;
+    MemoryRegion *mmio_high_alias;
+    MemoryRegion *mmio_reg;
+    MemoryRegion *ioport_reg;
+    int i;
+
+    dev = qdev_new(TYPE_GPEX_HOST);
+    sysbus_realize_and_unref(SYS_BUS_DEVICE(dev), &error_fatal);
+
+    /* Map the first ECAM_HIGH_SIZE bytes of ECAM space */
+    ecam_alias = g_new0(MemoryRegion, 1);
+    ecam_reg = sysbus_mmio_get_region(SYS_BUS_DEVICE(dev), 0);
+
+    memory_region_init_alias(ecam_alias, OBJECT(dev), "pcie-ecam",
+                             ecam_reg, 0, map->ecam_high_size);
+    memory_region_add_subregion(&s->mr_ps, map->ecam_high_addr, ecam_alias);
+
+    /* Map the MMIO window into PS address space */
+    mmio_alias = g_new0(MemoryRegion, 1);
+    mmio_reg = sysbus_mmio_get_region(SYS_BUS_DEVICE(dev), 1);
+    memory_region_init_alias(mmio_alias, OBJECT(dev), "pcie-mmio",
+                             mmio_reg, map->mmio_addr, map->mmio_size);
+    memory_region_add_subregion(&s->mr_ps, map->mmio_addr, mmio_alias);
+
+    /* Map the high MMIO window into PS address space */
+    mmio_high_alias = g_new0(MemoryRegion, 1);
+    memory_region_init_alias(mmio_high_alias, OBJECT(dev), "pcie-mmio-high",
+                             mmio_reg, map->mmio_high_addr,
+                             map->mmio_high_size);
+    memory_region_add_subregion(&s->mr_ps, map->mmio_high_addr,
+                                mmio_high_alias);
+
+    /* Map IO port space */
+    ioport_reg = sysbus_mmio_get_region(SYS_BUS_DEVICE(dev), 2);
+    memory_region_add_subregion(&s->mr_ps, map->pio_addr, ioport_reg);
+
+    /* Map IRQs */
+    for (i = 0; i < GPEX_NUM_IRQS; i++) {
+        versal_sysbus_connect_irq(s, SYS_BUS_DEVICE(dev), i, map->irq + i);
+        gpex_set_irq_num(GPEX_HOST(dev), i, map->irq + i);
+    }
+
+    /* configure root complex */
+    pci = PCI_HOST_BRIDGE(dev);
+    pci->bypass_iommu = true; //todo
 }
 
 static void versal_create_uart(Versal *s,
@@ -2021,6 +2102,7 @@ static void versal_realize(DeviceState *dev, Error **errp)
     versal_create_lpd_slcr(s, &map->slcr);
     versal_create_intlpd_csr(s, &map->int_csr);
     versal_create_pmcint(s, &map->pmcint);
+    versal_create_pcie(s, &map->pcibus);
 }
 
 static void versal2_realize(DeviceState *dev, Error **errp)
