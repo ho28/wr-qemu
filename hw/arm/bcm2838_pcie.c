@@ -230,14 +230,14 @@ static const TypeInfo bcm2838_pcie_host_info = {
  * RC root part (D0:F0)
  */
 
-static void bcm2838_pcie_root_port_reset_hold(Object *obj)
+static void bcm2838_pcie_root_port_reset_hold(Object *obj, ResetType type)
 {
     PCIERootPortClass *rpc = PCIE_ROOT_PORT_GET_CLASS(obj);
     PCIDevice *dev = PCI_DEVICE(obj);
     BCM2838PcieRootState *s = BCM2838_PCIE_ROOT(dev);
 
     if (rpc->parent_phases.hold) {
-        rpc->parent_phases.hold(obj);
+        rpc->parent_phases.hold(obj, type);
     }
 
     memset(s->regs, 0xFF, sizeof(s->regs));
