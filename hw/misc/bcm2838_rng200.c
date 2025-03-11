@@ -182,7 +182,7 @@ static uint32_t bcm2838_rng200_read_fifo_data(BCM2838Rng200State *s)
     uint32_t num = 0;
 
     while (to_read) {
-        buf = fifo8_pop_buf(fifo, to_read, &num);
+        buf = fifo8_pop_bufptr(fifo, to_read, &num);
         memcpy(p, buf, num);
         p += num;
         to_read -= num;
@@ -364,9 +364,9 @@ static void bcm2838_rng200_init(Object *obj)
     sysbus_init_mmio(sbd, &s->iomem);
 }
 
-static void bcm2838_rng200_reset(DeviceState *dev)
+static void bcm2838_rng200_reset_enter(Object *obj, ResetType type)
 {
-    BCM2838Rng200State *s = BCM2838_RNG200(dev);
+    BCM2838Rng200State *s = BCM2838_RNG200(obj);
 
     bcm2838_rng200_rbg_reset(s);
     bcm2838_rng200_rng_reset(s);
@@ -381,10 +381,11 @@ static Property bcm2838_rng200_properties[] = {
 static void bcm2838_rng200_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
+    ResettableClass *rc = RESETTABLE_CLASS(klass);
 
     dc->realize = bcm2838_rng200_realize;
-    dc->reset = bcm2838_rng200_reset;
     dc->vmsd = &vmstate_bcm2838_rng200;
+    rc->phases.enter = bcm2838_rng200_reset_enter;
 
     device_class_set_props(dc, bcm2838_rng200_properties);
 }
