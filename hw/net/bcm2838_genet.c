@@ -1042,9 +1042,9 @@ static void bcm2838_genet_phy_reset(BCM2838GenetState *s)
     bcm2838_genet_phy_update_link(s);
 }
 
-static void bcm2838_genet_reset(DeviceState *d)
+static void bcm2838_genet_reset_enter(Object *obj, ResetType type)
 {
-    BCM2838GenetState *s = BCM2838_GENET(d);
+    BCM2838GenetState *s = BCM2838_GENET(obj);
 
     memset(&s->regs, 0x00, sizeof(s->regs));
 
@@ -1067,10 +1067,11 @@ static Property genet_properties[] = {
 static void bcm2838_genet_class_init(ObjectClass *class, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(class);
+    ResettableClass *rc = RESETTABLE_CLASS(class);
 
     dc->realize = bcm2838_genet_realize;
-    dc->reset = bcm2838_genet_reset;
     device_class_set_props(dc, genet_properties);
+    rc->phases.enter = bcm2838_genet_reset_enter;
 }
 
 static const TypeInfo bcm2838_genet_info = {
