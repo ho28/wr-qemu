@@ -955,6 +955,10 @@ static void bcm2838_genet_phy_update_link(BCM2838GenetState *s)
                                           GENET_PHY_STAT_1000, HALF, 1);
         s->phy_regs.stat1000 = FIELD_DP32(s->phy_regs.stat1000,
                                           GENET_PHY_STAT_1000, FULL, 1);
+        s->phy_regs.stat1000 = FIELD_DP32(s->phy_regs.stat1000,
+                                          GENET_PHY_STAT_1000, REMRXOK, 1);
+        s->phy_regs.stat1000 = FIELD_DP32(s->phy_regs.stat1000,
+                                          GENET_PHY_STAT_1000, LOCALRXOK, 1);
 
         s->phy_regs.lpa = FIELD_DP32(s->phy_regs.lpa,
                                      GENET_PHY_LPA, PAUSE_CAP, 1);
