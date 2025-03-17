@@ -397,21 +397,24 @@ static uint64_t bcm2838_genet_mdio_cmd(BCM2838GenetState *s, uint64_t cmd)
 static void bcm2838_genet_xmit_packet(NetClientState *s, void *packet,
                                       size_t size)
 {
-    uint8_t *buf = packet + sizeof(BCM2838GenetXmitStatus);
+    uint8_t *buf = packet;
+    //uint8_t *buf = packet + sizeof(BCM2838GenetXmitStatus);
     size_t len = size;
-    uint16_t len_type = 0;
+    //uint16_t len_type = 0;
 
-    len -= sizeof(BCM2838GenetXmitStatus);
+    //len -= sizeof(BCM2838GenetXmitStatus);
     net_checksum_calculate(buf, len, CSUM_ALL);
 
+    /*
     memcpy(&len_type, &buf[12], sizeof(len_type));
+
     len_type = ntohs(len_type);
     if (len_type < MAX_PAYLOAD_SIZE) {
         len_type = len;
         len_type = htons(len_type);
         memcpy(&buf[12], &len_type, sizeof(len_type));
     }
-
+    */
     qemu_send_packet(s, buf, len);
 }
 
@@ -586,6 +589,9 @@ static void bcm2838_genet_tdma(BCM2838GenetState *s, hwaddr offset,
                             s->regs.intrl0.stat =
                                 FIELD_DP32(s->regs.intrl0.stat, GENET_INTRL_0,
                                            TXDMA_MBDONE, 1);
+                            s->regs.intrl0.stat =
+                                FIELD_DP32(s->regs.intrl0.stat, GENET_INTRL_0,
+                                           TXDMA_PDONE, 1);
                         } else {
                             tx_intrs =  FIELD_EX32(s->regs.intrl1.stat,
                                                    GENET_INTRL_1, TX_INTRS);
@@ -805,8 +811,10 @@ static ssize_t bcm2838_genet_rdma(BCM2838GenetState *s, uint32_t ring_idx,
         hwaddr dma_buf_addr =
             desc->address_lo + ((hwaddr)desc->address_hi << 32);
         MemTxResult mem_tx_result = MEMTX_OK;
-        uint8_t *frame_buf = dma_buf + sizeof(BCM2838GenetXmitStatus) + 2;
-        BCM2838GenetXmitStatus *xmit_status = (BCM2838GenetXmitStatus *)dma_buf;
+        //uint8_t *frame_buf = dma_buf + sizeof(BCM2838GenetXmitStatus) + 2;
+        uint8_t *frame_buf = dma_buf + 2;
+
+        //BCM2838GenetXmitStatus *xmit_status = (BCM2838GenetXmitStatus *)dma_buf;
         struct iovec iov;
         bool isip4, isip6;
         size_t l3hdr_off, l4hdr_off, l5hdr_off;
@@ -836,7 +844,8 @@ static ssize_t bcm2838_genet_rdma(BCM2838GenetState *s, uint32_t ring_idx,
                                          GENET_RDMA_LENGTH_STATUS,
                                          EOP, !!(len >= size));
 
-        buflength = l + sizeof(BCM2838GenetXmitStatus) + 2;
+        //buflength = l + sizeof(BCM2838GenetXmitStatus) + 2;
+        buflength = l + 2;
         if (crc_fwd) {
             buflength += 4;
         }
@@ -854,11 +863,13 @@ static ssize_t bcm2838_genet_rdma(BCM2838GenetState *s, uint32_t ring_idx,
                                          MULTICAST,
                                          !!is_packet_multicast(frame_buf, l));
 
+        /*
         xmit_status->rx_csum = 0;
         if (isip4) {
             xmit_status->rx_csum = ip4hdr_info.ip4_hdr.ip_sum;
         }
         xmit_status->length_status = desc->length_status;
+        */
 
         mem_tx_result = address_space_write(&s->dma_as, dma_buf_addr,
                                             MEMTXATTRS_UNSPECIFIED,
@@ -889,6 +900,8 @@ static ssize_t bcm2838_genet_rdma(BCM2838GenetState *s, uint32_t ring_idx,
     if (ring_idx == BCM2838_GENET_DMA_RING_DEFAULT) {
         s->regs.intrl0.stat = FIELD_DP32(s->regs.intrl0.stat,
                                          GENET_INTRL_0, RXDMA_MBDONE, 1);
+        s->regs.intrl0.stat = FIELD_DP32(s->regs.intrl0.stat,
+                                         GENET_INTRL_0, RXDMA_PDONE, 1);
     } else {
         uint32_t rx_intrs =
             FIELD_EX32(s->regs.intrl1.stat, GENET_INTRL_1, RX_INTRS);
