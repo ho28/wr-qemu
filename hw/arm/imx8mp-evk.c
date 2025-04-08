@@ -39,6 +39,7 @@ struct Imx8mpEvk {
         uint32_t clk_ext2;
         uint32_t clk_ext3;
         uint32_t clk_ext4;
+        uint32_t ccm;
     } phandle;
 };
 
@@ -125,6 +126,26 @@ static void imx8mp_fdt_add_clock(Imx8mpEvk *s,
     g_free(name);
 }
 
+static void imx8mp_fdt_add_ccm(Imx8mpEvk *s,
+                               const char *parent)
+{
+    char *name;
+
+    name = g_strdup_printf("%s/clock-controller@%lx", parent,
+                           fsl_imx8mp_memmap[FSL_IMX8MP_CCM].addr);
+    qemu_fdt_add_subnode(s->fdt, name);
+    qemu_fdt_setprop_cell(s->fdt, name, "phandle", s->phandle.ccm);
+    qemu_fdt_setprop_cells(s->fdt, name, "clocks",
+                           s->phandle.osc_32k,
+                           s->phandle.osc_24m);
+    qemu_fdt_setprop_cell(s->fdt, name, "#clock-cells", 0x0);
+    qemu_fdt_setprop_sized_cells(s->fdt, name, "reg",
+                                 1, fsl_imx8mp_memmap[FSL_IMX8MP_CCM].addr,
+                                 1, fsl_imx8mp_memmap[FSL_IMX8MP_CCM].size);
+    qemu_fdt_setprop_string(s->fdt, name, "compatible", "fsl,imx8mp-ccm");
+    g_free(name);
+}
+
 static void imx8mp_fdt_add_soc(Imx8mpEvk *s,
                                const char *parent)
 {
@@ -138,6 +159,8 @@ static void imx8mp_fdt_add_soc(Imx8mpEvk *s,
     qemu_fdt_setprop_cell(s->fdt, name, "#size-cells", 0x1);
     qemu_fdt_setprop_cell(s->fdt, name, "#address-cells", 0x1);
     qemu_fdt_setprop_string(s->fdt, name, "compatible", "simple-bus");
+
+    imx8mp_fdt_add_ccm(s, name);
 
     g_free(name);
 }
@@ -163,6 +186,7 @@ static void imx8mp_fdt_create(Imx8mpEvk *s,
     s->phandle.clk_ext2 = qemu_fdt_alloc_phandle(s->fdt);
     s->phandle.clk_ext3 = qemu_fdt_alloc_phandle(s->fdt);
     s->phandle.clk_ext4 = qemu_fdt_alloc_phandle(s->fdt);
+    s->phandle.ccm = qemu_fdt_alloc_phandle(s->fdt);
 
     /* Device Tree Root */
     root = g_strdup_printf("/");
